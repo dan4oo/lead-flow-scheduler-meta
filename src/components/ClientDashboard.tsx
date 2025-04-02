@@ -7,7 +7,8 @@ import {
   leads, 
   clients, 
   getCampaignsByClientId, 
-  getLeadsByClientId 
+  getLeadsByClientId,
+  getLeadsByCampaign 
 } from '@/data/mockData';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,12 +17,15 @@ import { format, subDays } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { getFacebookAdStats } from '@/services/FacebookAdsService';
 import FacebookAdStatsCard from './FacebookAdStats';
+import { ChartContainer, ChartTooltipContent, ChartTooltip } from '@/components/ui/chart';
+import { LeadStatus } from '@/types/crm';
 
 const ClientDashboard = () => {
   // In a real app, this would come from auth context
   // For this demo, we're using the clientId from localStorage
   const [clientId, setClientId] = useState('westside');
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+  const [selectedCampaignLeads, setSelectedCampaignLeads] = useState<any[]>([]);
   
   // Get the user role from localStorage (for the demo)
   useEffect(() => {
@@ -44,6 +48,27 @@ const ClientDashboard = () => {
     queryFn: () => selectedCampaignId ? getFacebookAdStats(selectedCampaignId) : null,
     enabled: !!selectedCampaignId,
   });
+  
+  // Update selected campaign leads when campaign changes
+  useEffect(() => {
+    if (selectedCampaignId) {
+      const campaignMapping = {
+        'campaign1': 'fb-camp-1',
+        'campaign2': 'fb-camp-2',
+        'campaign3': 'fb-camp-3',
+      };
+      
+      // Find the original campaign ID from the Facebook campaign ID
+      const originalCampaignId = Object.entries(campaignMapping).find(
+        ([, fbId]) => fbId === selectedCampaignId
+      )?.[0];
+      
+      if (originalCampaignId) {
+        const campaignLeads = getLeadsByCampaign(originalCampaignId);
+        setSelectedCampaignLeads(campaignLeads);
+      }
+    }
+  }, [selectedCampaignId]);
   
   // Data transformation for campaign performance
   const campaignLeadCounts = clientCampaigns.map(campaign => {
@@ -91,8 +116,43 @@ const ClientDashboard = () => {
 
   const trendData = generateTrendData();
 
+  // Generate lead status distribution data
+  const generateLeadStatusData = (leadsData) => {
+    const statusCounts = {
+      new: 0,
+      contacted: 0,
+      qualified: 0,
+      appointment_scheduled: 0,
+      closed_won: 0,
+      closed_lost: 0
+    };
+    
+    leadsData.forEach(lead => {
+      statusCounts[lead.status]++;
+    });
+    
+    return Object.entries(statusCounts).map(([status, count]) => ({
+      name: status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      value: count,
+      status
+    }));
+  };
+
+  const allLeadsStatusData = generateLeadStatusData(clientLeads);
+  
+  // Generate selected campaign lead status data
+  const selectedLeadsStatusData = generateLeadStatusData(selectedCampaignLeads);
+
   // Colors for charts
   const COLORS = ['#1976d2', '#009688', '#ff9800', '#f44336', '#9c27b0', '#673ab7'];
+  const STATUS_COLORS = {
+    new: '#3b82f6',
+    contacted: '#8b5cf6', 
+    qualified: '#10b981',
+    appointment_scheduled: '#f59e0b',
+    closed_won: '#22c55e',
+    closed_lost: '#ef4444'
+  };
 
   // Format date for display
   const formatDate = (dateString: Date) => {
@@ -131,6 +191,73 @@ const ClientDashboard = () => {
     const campaign = campaigns.find(c => c.id === campaignId);
     return campaign?.name || 'Unknown Campaign';
   };
+
+  // Calculate appointments by campaign
+  const appointmentsByCampaign = clientCampaigns.map(campaign => {
+    const campaignLeads = clientLeads.filter(lead => lead.campaignId === campaign.id);
+    const appointmentsCount = campaignLeads.filter(lead => 
+      lead.status === 'appointment_scheduled' || lead.status === 'closed_won'
+    ).length;
+    
+    return {
+      name: campaign.name,
+      appointments: appointmentsCount,
+      count: campaignLeads.length,
+      appointmentRate: campaignLeads.length ? Math.round((appointmentsCount / campaignLeads.length) * 100) : 0
+    };
+  });
+
+  // Calculate billing information
+  const getCurrentMonth = () => {
+    const date = new Date();
+    return format(date, 'MMMM yyyy');
+  };
+
+  const calculateBilling = () => {
+    let totalSpend = 0;
+    let totalLeads = 0;
+    let totalAppointments = 0;
+    
+    clientCampaigns.forEach(campaign => {
+      const fbCampaignId = campaign.id === 'campaign1' ? 'fb-camp-1' : 
+                           campaign.id === 'campaign2' ? 'fb-camp-2' : 
+                           campaign.id === 'campaign3' ? 'fb-camp-3' : null;
+      
+      // In a real app, we would fetch this data from the Facebook API
+      if (fbCampaignId) {
+        const stats = {
+          'fb-camp-1': { spend: 1037.29, leads: 32 },
+          'fb-camp-2': { spend: 642.72, leads: 15 },
+          'fb-camp-3': { spend: 1487.7, leads: 41 }
+        }[fbCampaignId];
+        
+        if (stats) {
+          totalSpend += stats.spend;
+          totalLeads += stats.leads;
+        }
+      }
+      
+      // Count appointments
+      const campaignLeads = clientLeads.filter(lead => lead.campaignId === campaign.id);
+      totalAppointments += campaignLeads.filter(lead => 
+        lead.status === 'appointment_scheduled' || lead.status === 'closed_won'
+      ).length;
+    });
+    
+    const costPerLead = totalLeads ? (totalSpend / totalLeads).toFixed(2) : 0;
+    const costPerAppointment = totalAppointments ? (totalSpend / totalAppointments).toFixed(2) : 0;
+    
+    return {
+      totalSpend,
+      totalLeads,
+      totalAppointments,
+      costPerLead,
+      costPerAppointment,
+      month: getCurrentMonth()
+    };
+  };
+
+  const billingInfo = calculateBilling();
 
   return (
     <div className="p-6">
@@ -175,29 +302,131 @@ const ClientDashboard = () => {
           <TabsTrigger value="campaigns">Campaign Performance</TabsTrigger>
           <TabsTrigger value="leads">Your Leads</TabsTrigger>
           <TabsTrigger value="trends">Trends</TabsTrigger>
+          <TabsTrigger value="billing">Billing</TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview">
-          <Card>
-            <CardHeader>
-              <CardTitle>Campaign Performance</CardTitle>
-              <p className="text-sm text-muted-foreground">Click on a campaign bar to view detailed Facebook metrics</p>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80">
-                <CampaignBarChart />
-              </div>
-              
-              {selectedCampaignId && (
-                <div className="mt-6">
-                  <FacebookAdStatsCard 
-                    stats={campaignStats} 
-                    isLoading={isLoadingStats} 
-                  />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Campaign Performance</CardTitle>
+                <p className="text-sm text-muted-foreground">Click on a campaign bar to view detailed Facebook metrics</p>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  <CampaignBarChart />
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Lead Status Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={allLeadsStatusData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({name, percent}) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                      >
+                        {allLeadsStatusData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.status] || COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {selectedCampaignId && (
+              <div className="col-span-1 md:col-span-2 mt-6">
+                <FacebookAdStatsCard 
+                  stats={campaignStats} 
+                  isLoading={isLoadingStats} 
+                />
+              </div>
+            )}
+            
+            {selectedCampaignId && selectedCampaignLeads.length > 0 && (
+              <div className="col-span-1 md:col-span-2 mt-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Campaign Lead Status Distribution</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="h-80">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={selectedLeadsStatusData}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              outerRadius={80}
+                              fill="#8884d8"
+                              dataKey="value"
+                              label={({name, percent}) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                            >
+                              {selectedLeadsStatusData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.status] || COLORS[index % COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold mb-4">Campaign Leads</h3>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Name</TableHead>
+                              <TableHead>Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {selectedCampaignLeads.slice(0, 5).map(lead => (
+                              <TableRow key={lead.id}>
+                                <TableCell>{lead.firstName} {lead.lastName}</TableCell>
+                                <TableCell>
+                                  <Badge className={
+                                    lead.status === 'new' ? 'bg-blue-100 text-blue-800' : 
+                                    lead.status === 'contacted' ? 'bg-indigo-100 text-indigo-800' :
+                                    lead.status === 'qualified' ? 'bg-purple-100 text-purple-800' :
+                                    lead.status === 'appointment_scheduled' ? 'bg-amber-100 text-amber-800' :
+                                    lead.status === 'closed_won' ? 'bg-green-100 text-green-800' :
+                                    'bg-red-100 text-red-800'
+                                  }>
+                                    {lead.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                        {selectedCampaignLeads.length > 5 && (
+                          <p className="text-sm text-center mt-2 text-muted-foreground">
+                            Showing 5 of {selectedCampaignLeads.length} leads
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </div>
         </TabsContent>
         
         <TabsContent value="campaigns">
@@ -215,11 +444,13 @@ const ClientDashboard = () => {
                       <TableHead>Platform</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Leads</TableHead>
+                      <TableHead>Appointments</TableHead>
+                      <TableHead>Appointment Rate</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {clientCampaigns.map(campaign => {
-                      const campaignLeads = clientLeads.filter(lead => lead.campaignId === campaign.id);
+                      const campaignData = appointmentsByCampaign.find(c => c.name === campaign.name);
                       return (
                         <TableRow 
                           key={campaign.id}
@@ -240,7 +471,9 @@ const ClientDashboard = () => {
                               {campaign.status}
                             </Badge>
                           </TableCell>
-                          <TableCell>{campaignLeads.length}</TableCell>
+                          <TableCell>{campaignData?.count || 0}</TableCell>
+                          <TableCell>{campaignData?.appointments || 0}</TableCell>
+                          <TableCell>{campaignData?.appointmentRate || 0}%</TableCell>
                         </TableRow>
                       );
                     })}
@@ -254,6 +487,74 @@ const ClientDashboard = () => {
                 stats={campaignStats} 
                 isLoading={isLoadingStats} 
               />
+            )}
+            
+            {selectedCampaignId && selectedCampaignLeads.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Campaign Lead Status Distribution</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={selectedLeadsStatusData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="value"
+                            label={({name, percent}) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                          >
+                            {selectedLeadsStatusData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.status] || COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Campaign Leads</h3>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedCampaignLeads.slice(0, 5).map(lead => (
+                            <TableRow key={lead.id}>
+                              <TableCell>{lead.firstName} {lead.lastName}</TableCell>
+                              <TableCell>
+                                <Badge className={
+                                  lead.status === 'new' ? 'bg-blue-100 text-blue-800' : 
+                                  lead.status === 'contacted' ? 'bg-indigo-100 text-indigo-800' :
+                                  lead.status === 'qualified' ? 'bg-purple-100 text-purple-800' :
+                                  lead.status === 'appointment_scheduled' ? 'bg-amber-100 text-amber-800' :
+                                  lead.status === 'closed_won' ? 'bg-green-100 text-green-800' :
+                                  'bg-red-100 text-red-800'
+                                }>
+                                  {lead.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      {selectedCampaignLeads.length > 5 && (
+                        <p className="text-sm text-center mt-2 text-muted-foreground">
+                          Showing 5 of {selectedCampaignLeads.length} leads
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </div>
         </TabsContent>
@@ -317,6 +618,89 @@ const ClientDashboard = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+        
+        <TabsContent value="billing">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Current Billing Period</CardTitle>
+                <p className="text-sm text-muted-foreground">{billingInfo.month}</p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-muted rounded-md p-4">
+                      <p className="text-sm text-muted-foreground">Total Ad Spend</p>
+                      <p className="text-2xl font-bold">${billingInfo.totalSpend.toFixed(2)}</p>
+                    </div>
+                    
+                    <div className="bg-muted rounded-md p-4">
+                      <p className="text-sm text-muted-foreground">Total Leads</p>
+                      <p className="text-2xl font-bold">{billingInfo.totalLeads}</p>
+                    </div>
+                    
+                    <div className="bg-muted rounded-md p-4">
+                      <p className="text-sm text-muted-foreground">Cost Per Lead</p>
+                      <p className="text-2xl font-bold">${billingInfo.costPerLead}</p>
+                    </div>
+                    
+                    <div className="bg-muted rounded-md p-4">
+                      <p className="text-sm text-muted-foreground">Cost Per Appointment</p>
+                      <p className="text-2xl font-bold">${billingInfo.costPerAppointment}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-muted rounded-md p-4">
+                    <p className="text-sm text-muted-foreground">Total Appointments</p>
+                    <p className="text-2xl font-bold">{billingInfo.totalAppointments}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Billing Breakdown by Campaign</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Campaign</TableHead>
+                      <TableHead>Spend</TableHead>
+                      <TableHead>Leads</TableHead>
+                      <TableHead>Cost/Lead</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {clientCampaigns.map(campaign => {
+                      const fbCampaignId = campaign.id === 'campaign1' ? 'fb-camp-1' : 
+                                           campaign.id === 'campaign2' ? 'fb-camp-2' : 
+                                           campaign.id === 'campaign3' ? 'fb-camp-3' : null;
+                      
+                      const stats = fbCampaignId ? {
+                        'fb-camp-1': { spend: 1037.29, leads: 32 },
+                        'fb-camp-2': { spend: 642.72, leads: 15 },
+                        'fb-camp-3': { spend: 1487.7, leads: 41 }
+                      }[fbCampaignId] : null;
+                      
+                      return (
+                        <TableRow key={campaign.id}>
+                          <TableCell className="font-medium">{campaign.name}</TableCell>
+                          <TableCell>${stats?.spend.toFixed(2) || '0.00'}</TableCell>
+                          <TableCell>{stats?.leads || 0}</TableCell>
+                          <TableCell>
+                            ${stats?.leads ? (stats.spend / stats.leads).toFixed(2) : '0.00'}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
