@@ -13,11 +13,15 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pi
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format, subDays } from 'date-fns';
+import { useQuery } from '@tanstack/react-query';
+import { getFacebookAdStats } from '@/services/FacebookAdsService';
+import FacebookAdStatsCard from './FacebookAdStats';
 
 const ClientDashboard = () => {
   // In a real app, this would come from auth context
   // For this demo, we're using the clientId from localStorage
   const [clientId, setClientId] = useState('westside');
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   
   // Get the user role from localStorage (for the demo)
   useEffect(() => {
@@ -34,23 +38,24 @@ const ClientDashboard = () => {
   const clientCampaigns = getCampaignsByClientId(clientId);
   const clientLeads = getLeadsByClientId(clientId);
   
-  // Data transformation for lead status chart
-  const statusCounts = clientLeads.reduce((acc, lead) => {
-    acc[lead.status] = (acc[lead.status] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const statusChartData = Object.entries(statusCounts).map(([status, count]) => ({
-    name: status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-    value: count
-  }));
-
+  // Fetch Facebook Ad Stats for selected campaign
+  const { data: campaignStats, isLoading: isLoadingStats } = useQuery({
+    queryKey: ['facebookAdStats', selectedCampaignId],
+    queryFn: () => selectedCampaignId ? getFacebookAdStats(selectedCampaignId) : null,
+    enabled: !!selectedCampaignId,
+  });
+  
   // Data transformation for campaign performance
   const campaignLeadCounts = clientCampaigns.map(campaign => {
     const count = clientLeads.filter(lead => lead.campaignId === campaign.id).length;
     return {
       name: campaign.name,
-      count
+      count,
+      id: campaign.id,
+      // Add Facebook campaign ID mapping
+      facebookCampaignId: campaign.id === 'campaign1' ? 'fb-camp-1' : 
+                          campaign.id === 'campaign2' ? 'fb-camp-2' : 
+                          campaign.id === 'campaign3' ? 'fb-camp-3' : undefined
     };
   });
   
@@ -86,13 +91,45 @@ const ClientDashboard = () => {
 
   const trendData = generateTrendData();
 
-  // Colors for the pie chart
+  // Colors for charts
   const COLORS = ['#1976d2', '#009688', '#ff9800', '#f44336', '#9c27b0', '#673ab7'];
 
   // Format date for display
   const formatDate = (dateString: Date) => {
     const date = new Date(dateString);
     return date.toLocaleDateString();
+  };
+
+  // Handle campaign click
+  const handleCampaignClick = (campaignId: string) => {
+    // Get Facebook campaign ID
+    const campaign = campaignLeadCounts.find(c => c.id === campaignId);
+    if (campaign?.facebookCampaignId) {
+      setSelectedCampaignId(campaign.facebookCampaignId);
+    }
+  };
+
+  // Campaign bar chart with clickable bars
+  const CampaignBarChart = () => (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={campaignLeadCounts}>
+        <XAxis dataKey="name" />
+        <YAxis />
+        <Tooltip />
+        <Bar 
+          dataKey="count" 
+          fill="#1976d2"
+          onClick={(data) => handleCampaignClick(data.id)}
+          cursor="pointer"
+        />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+
+  // Get campaign name for a lead
+  const getCampaignName = (campaignId: string) => {
+    const campaign = campaigns.find(c => c.id === campaignId);
+    return campaign?.name || 'Unknown Campaign';
   };
 
   return (
@@ -144,27 +181,31 @@ const ClientDashboard = () => {
           <Card>
             <CardHeader>
               <CardTitle>Campaign Performance</CardTitle>
+              <p className="text-sm text-muted-foreground">Click on a campaign bar to view detailed Facebook metrics</p>
             </CardHeader>
             <CardContent>
               <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={campaignLeadCounts}>
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#1976d2" />
-                  </BarChart>
-                </ResponsiveContainer>
+                <CampaignBarChart />
               </div>
+              
+              {selectedCampaignId && (
+                <div className="mt-6">
+                  <FacebookAdStatsCard 
+                    stats={campaignStats} 
+                    isLoading={isLoadingStats} 
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
         
         <TabsContent value="campaigns">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>Your Active Campaigns</CardTitle>
+                <p className="text-sm text-muted-foreground">Click on a campaign to view detailed Facebook metrics</p>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -180,7 +221,16 @@ const ClientDashboard = () => {
                     {clientCampaigns.map(campaign => {
                       const campaignLeads = clientLeads.filter(lead => lead.campaignId === campaign.id);
                       return (
-                        <TableRow key={campaign.id}>
+                        <TableRow 
+                          key={campaign.id}
+                          className="cursor-pointer hover:bg-muted"
+                          onClick={() => {
+                            const mappedId = campaign.id === 'campaign1' ? 'fb-camp-1' : 
+                                            campaign.id === 'campaign2' ? 'fb-camp-2' : 
+                                            campaign.id === 'campaign3' ? 'fb-camp-3' : null;
+                            if (mappedId) setSelectedCampaignId(mappedId);
+                          }}
+                        >
                           <TableCell className="font-medium">{campaign.name}</TableCell>
                           <TableCell>{campaign.platform}</TableCell>
                           <TableCell>
@@ -199,34 +249,12 @@ const ClientDashboard = () => {
               </CardContent>
             </Card>
             
-            <Card>
-              <CardHeader>
-                <CardTitle>Lead Status Distribution</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={statusChartData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={true}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {statusChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+            {selectedCampaignId && (
+              <FacebookAdStatsCard 
+                stats={campaignStats} 
+                isLoading={isLoadingStats} 
+              />
+            )}
           </div>
         </TabsContent>
         
@@ -241,7 +269,7 @@ const ClientDashboard = () => {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Date Added</TableHead>
-                    <TableHead>Source</TableHead>
+                    <TableHead>Campaign</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -250,7 +278,7 @@ const ClientDashboard = () => {
                     <TableRow key={lead.id}>
                       <TableCell className="font-medium">{lead.firstName} {lead.lastName}</TableCell>
                       <TableCell>{formatDate(lead.dateAdded)}</TableCell>
-                      <TableCell>{lead.source}</TableCell>
+                      <TableCell>{getCampaignName(lead.campaignId)}</TableCell>
                       <TableCell>
                         <Badge className={
                           lead.status === 'new' ? 'bg-blue-100 text-blue-800' : 

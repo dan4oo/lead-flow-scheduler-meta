@@ -38,6 +38,7 @@ export type Campaign = {
   budget: number;
   status: 'active' | 'paused' | 'completed';
   clientId: string;
+  facebookCampaignId?: string;
 };
 
 export type Lead = {
@@ -54,4 +55,16 @@ export type Lead = {
   communicationHistory: CommunicationHistory[];
   appointmentInfo?: Appointment;
   notes: string;
+};
+
+export type FacebookAdStats = {
+  campaignId: string;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  leads: number;
+  calls: number;
+  cpc: number;
+  spend: number;
+  lastUpdated: Date;
 };
