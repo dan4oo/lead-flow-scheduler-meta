@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -7,11 +8,14 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from "@/components/ui/use-toast";
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PlusCircle, UserPlus } from 'lucide-react';
 
 const Settings = () => {
   const { toast } = useToast();
   const [googleConnected, setGoogleConnected] = useState(false);
   const [metaConnected, setMetaConnected] = useState(false);
+  const [showAddUserForm, setShowAddUserForm] = useState(false);
   
   const handleSaveGeneral = () => {
     toast({
@@ -33,6 +37,14 @@ const Settings = () => {
     toast({
       title: "Connected to Meta",
       description: "Your Meta Ads account is now connected",
+    });
+  };
+
+  const handleAddUser = () => {
+    setShowAddUserForm(false);
+    toast({
+      title: "User Added",
+      description: "New user has been added successfully",
     });
   };
 
@@ -167,15 +179,57 @@ const Settings = () => {
         </TabsContent>
         
         <TabsContent value="users">
-          <Card>
+          <Card className="mb-6">
             <CardHeader>
               <CardTitle>User Management</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium">Team Members</h3>
-                <Button>Add User</Button>
+                <Button onClick={() => setShowAddUserForm(true)}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add User
+                </Button>
               </div>
+              
+              {showAddUserForm && (
+                <div className="mb-6 p-4 border rounded-md">
+                  <h4 className="font-medium mb-3">Add New User</h4>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="firstName">First Name</Label>
+                        <Input id="firstName" placeholder="First Name" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input id="lastName" placeholder="Last Name" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input id="email" type="email" placeholder="Email Address" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="role">Role</Label>
+                      <Select defaultValue="user">
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="user">User</SelectItem>
+                          <SelectItem value="client">Client</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="pt-2 flex justify-end space-x-2">
+                      <Button variant="outline" onClick={() => setShowAddUserForm(false)}>Cancel</Button>
+                      <Button onClick={handleAddUser}>Add User</Button>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               <div className="border rounded-md">
                 <div className="flex items-center justify-between p-4 border-b">
@@ -191,7 +245,7 @@ const Settings = () => {
                   <Badge>Admin</Badge>
                 </div>
                 
-                <div className="flex items-center justify-between p-4">
+                <div className="flex items-center justify-between p-4 border-b">
                   <div className="flex items-center space-x-4">
                     <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                       <span className="text-primary font-medium">JS</span>
@@ -202,6 +256,60 @@ const Settings = () => {
                     </div>
                   </div>
                   <Badge variant="outline">User</Badge>
+                </div>
+                
+                <div className="flex items-center justify-between p-4">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-primary font-medium">AC</span>
+                    </div>
+                    <div>
+                      <p className="font-medium">Acme Corporation</p>
+                      <p className="text-sm text-gray-500">client@acmecorp.com</p>
+                    </div>
+                  </div>
+                  <Badge variant="secondary">Client</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Client Access</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b pb-4">
+                  <div>
+                    <h3 className="font-medium">Client Dashboard Access</h3>
+                    <p className="text-sm text-gray-500">Allow clients to view their own dashboard</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+
+                <div className="flex items-center justify-between border-b pb-4">
+                  <div>
+                    <h3 className="font-medium">Campaign Reports</h3>
+                    <p className="text-sm text-gray-500">Show ad campaign performance reports to clients</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+
+                <div className="flex items-center justify-between border-b pb-4">
+                  <div>
+                    <h3 className="font-medium">Lead Information</h3>
+                    <p className="text-sm text-gray-500">Allow clients to see their leads and contact information</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+
+                <div className="flex items-center justify-between pb-4">
+                  <div>
+                    <h3 className="font-medium">Appointment Schedule</h3>
+                    <p className="text-sm text-gray-500">Allow clients to view upcoming appointments</p>
+                  </div>
+                  <Switch defaultChecked />
                 </div>
               </div>
             </CardContent>

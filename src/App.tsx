@@ -11,6 +11,7 @@ import LeadDetail from "./components/LeadDetail";
 import CalendarView from "./components/CalendarView";
 import Settings from "./components/Settings";
 import NotFound from "./components/NotFound";
+import ClientDashboard from "./components/ClientDashboard";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="leads/:id" element={<LeadDetail />} />
             <Route path="calendar" element={<CalendarView />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="client-dashboard" element={<ClientDashboard />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>

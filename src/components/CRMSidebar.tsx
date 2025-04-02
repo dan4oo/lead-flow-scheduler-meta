@@ -12,7 +12,9 @@ import {
   Settings, 
   LogOut,
   Menu,
-  UserCircle
+  UserCircle,
+  LineChart,
+  Briefcase
 } from 'lucide-react';
 
 type SidebarProps = {
@@ -23,7 +25,10 @@ type SidebarProps = {
 const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
   const location = useLocation();
   
-  const mainNav = [
+  // In a real app, this would come from your auth context
+  const userRole = window.localStorage.getItem('userRole') || 'admin';
+  
+  const adminNav = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
     { icon: Users, label: 'Leads', path: '/leads' },
     { icon: Calendar, label: 'Calendar', path: '/calendar' },
@@ -31,14 +36,34 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
     { icon: BarChart, label: 'Reports', path: '/reports' },
   ];
   
-  const secondaryNav = [
-    { icon: Settings, label: 'Settings', path: '/settings' },
+  const clientNav = [
+    { icon: LayoutDashboard, label: 'Dashboard', path: '/client-dashboard' },
+    { icon: LineChart, label: 'Campaign Performance', path: '/client-dashboard?tab=campaigns' },
+    { icon: Briefcase, label: 'My Leads', path: '/client-dashboard?tab=leads' },
   ];
+  
+  const mainNav = userRole === 'client' ? clientNav : adminNav;
+  
+  const secondaryNav = userRole === 'client' 
+    ? [] 
+    : [{ icon: Settings, label: 'Settings', path: '/settings' }];
   
   const isActive = (path: string) => {
     if (path === '/' && location.pathname === '/') return true;
+    if (path.includes('?')) {
+      const pathPart = path.split('?')[0];
+      return location.pathname.startsWith(pathPart);
+    }
     if (path !== '/' && location.pathname.startsWith(path)) return true;
     return false;
+  };
+
+  const handleRoleToggle = () => {
+    // In a real app, this would be handled by a proper auth system
+    // This is just for demonstration purposes
+    const newRole = userRole === 'admin' ? 'client' : 'admin';
+    window.localStorage.setItem('userRole', newRole);
+    window.location.href = newRole === 'admin' ? '/' : '/client-dashboard';
   };
 
   return (
@@ -96,23 +121,25 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
             ))}
           </nav>
           
-          <div className="px-2 space-y-1 pt-6 mt-6 border-t border-sidebar-border">
-            {secondaryNav.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={cn(
-                  "flex items-center px-3 py-2 text-sm font-medium rounded-md mb-1",
-                  isActive(item.path)
-                    ? "bg-sidebar-accent text-sidebar-foreground"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}
-              >
-                <item.icon className="mr-3 h-5 w-5" />
-                {item.label}
-              </Link>
-            ))}
-          </div>
+          {secondaryNav.length > 0 && (
+            <div className="px-2 space-y-1 pt-6 mt-6 border-t border-sidebar-border">
+              {secondaryNav.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={cn(
+                    "flex items-center px-3 py-2 text-sm font-medium rounded-md mb-1",
+                    isActive(item.path)
+                      ? "bg-sidebar-accent text-sidebar-foreground"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <item.icon className="mr-3 h-5 w-5" />
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
         
         <div className="p-4 border-t border-sidebar-border">
@@ -121,16 +148,31 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
               <UserCircle className="h-8 w-8 text-sidebar-foreground" />
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-sidebar-foreground">Admin User</p>
-              <p className="text-xs text-sidebar-foreground/80">admin@example.com</p>
+              <p className="text-sm font-medium text-sidebar-foreground">
+                {userRole === 'admin' ? 'Admin User' : 'Client User'}
+              </p>
+              <p className="text-xs text-sidebar-foreground/80">
+                {userRole === 'admin' ? 'admin@example.com' : 'client@acmecorp.com'}
+              </p>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="ml-auto text-sidebar-foreground hover:text-white hover:bg-sidebar-accent"
-            >
-              <LogOut className="h-5 w-5" />
-            </Button>
+            <div className="ml-auto flex">
+              {/* Demo toggle button - in a real app this would be handled by auth system */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRoleToggle}
+                className="text-xs text-sidebar-foreground hover:text-white hover:bg-sidebar-accent"
+              >
+                Switch to {userRole === 'admin' ? 'Client' : 'Admin'}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-sidebar-foreground hover:text-white hover:bg-sidebar-accent"
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
