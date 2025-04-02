@@ -14,8 +14,10 @@ import {
   Menu,
   UserCircle,
   LineChart,
-  Briefcase
+  Briefcase,
+  CreditCard
 } from 'lucide-react';
+import { clients } from '@/data/mockData';
 
 type SidebarProps = {
   isOpen: boolean;
@@ -27,6 +29,9 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
   
   // In a real app, this would come from your auth context
   const userRole = window.localStorage.getItem('userRole') || 'admin';
+  // For demo purposes, use westside client in client role
+  const clientId = 'westside';
+  const client = clients.find(c => c.id === clientId);
   
   const adminNav = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
@@ -40,6 +45,7 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
     { icon: LayoutDashboard, label: 'Dashboard', path: '/client-dashboard' },
     { icon: LineChart, label: 'Campaign Performance', path: '/client-dashboard?tab=campaigns' },
     { icon: Briefcase, label: 'My Leads', path: '/client-dashboard?tab=leads' },
+    { icon: CreditCard, label: 'Billing', path: '/client-dashboard?tab=billing' },
   ];
   
   const mainNav = userRole === 'client' ? clientNav : adminNav;
@@ -103,6 +109,17 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
         </div>
         
         <div className="flex flex-col flex-1 pt-5 pb-4 overflow-y-auto">
+          {userRole === 'client' && (
+            <div className="px-4 mb-4">
+              <div className="text-sm font-medium text-sidebar-foreground/70 mb-1">
+                Client Account
+              </div>
+              <div className="text-sidebar-foreground font-medium">
+                {client?.name || 'Client Dashboard'}
+              </div>
+            </div>
+          )}
+          
           <nav className="flex-1 px-2 space-y-1">
             {mainNav.map((item) => (
               <Link
@@ -149,10 +166,10 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-sidebar-foreground">
-                {userRole === 'admin' ? 'Admin User' : 'Client User'}
+                {userRole === 'admin' ? 'Admin User' : `${client?.name}`}
               </p>
               <p className="text-xs text-sidebar-foreground/80">
-                {userRole === 'admin' ? 'admin@example.com' : 'client@acmecorp.com'}
+                {userRole === 'admin' ? 'admin@example.com' : client?.email}
               </p>
             </div>
             <div className="ml-auto flex">

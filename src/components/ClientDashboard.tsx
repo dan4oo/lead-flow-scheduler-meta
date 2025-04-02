@@ -1,18 +1,38 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { campaigns, leads } from '@/data/mockData';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { 
+  campaigns, 
+  leads, 
+  clients, 
+  getCampaignsByClientId, 
+  getLeadsByClientId 
+} from '@/data/mockData';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { format, subDays } from 'date-fns';
 
 const ClientDashboard = () => {
-  // Filter data for the specific client (in a real app, you'd filter by client ID)
-  // For this example, we'll use the first campaign as the client's campaign
-  const clientId = "acme"; // This would be dynamic in a real app
-  const clientCampaigns = campaigns.filter(campaign => campaign.id.includes(clientId));
-  const clientLeads = leads.filter(lead => clientCampaigns.some(campaign => campaign.id === lead.campaignId));
+  // In a real app, this would come from auth context
+  // For this demo, we're using the clientId from localStorage
+  const [clientId, setClientId] = useState('westside');
+  
+  // Get the user role from localStorage (for the demo)
+  useEffect(() => {
+    const userRole = window.localStorage.getItem('userRole') || 'admin';
+    if (userRole !== 'client') {
+      window.localStorage.setItem('userRole', 'client');
+    }
+  }, []);
+
+  // Get client data
+  const client = clients.find(c => c.id === clientId);
+  
+  // Get campaigns and leads for the client
+  const clientCampaigns = getCampaignsByClientId(clientId);
+  const clientLeads = getLeadsByClientId(clientId);
   
   // Data transformation for lead status chart
   const statusCounts = clientLeads.reduce((acc, lead) => {
@@ -44,6 +64,28 @@ const ClientDashboard = () => {
   const conversionRate = totalLeads ? Math.round((closedWon / totalLeads) * 100) : 0;
   const appointmentRate = totalLeads ? Math.round((appointmentsScheduled / totalLeads) * 100) : 0;
 
+  // Generate trend data for the last 30 days
+  const generateTrendData = () => {
+    const data = [];
+    for (let i = 30; i >= 0; i--) {
+      const date = subDays(new Date(), i);
+      // Count leads that were added on this date
+      const leadsOnDate = clientLeads.filter(lead => 
+        lead.dateAdded.getDate() === date.getDate() &&
+        lead.dateAdded.getMonth() === date.getMonth() &&
+        lead.dateAdded.getFullYear() === date.getFullYear()
+      ).length;
+      
+      data.push({
+        date: format(date, 'MMM dd'),
+        leads: leadsOnDate,
+      });
+    }
+    return data;
+  };
+
+  const trendData = generateTrendData();
+
   // Colors for the pie chart
   const COLORS = ['#1976d2', '#009688', '#ff9800', '#f44336', '#9c27b0', '#673ab7'];
 
@@ -55,7 +97,8 @@ const ClientDashboard = () => {
 
   return (
     <div className="p-6">
-      <h1 className="text-3xl font-bold mb-6">Your Dashboard</h1>
+      <h1 className="text-3xl font-bold mb-2">{client?.name || 'Client'} Dashboard</h1>
+      <p className="text-muted-foreground mb-6">Welcome to your campaign performance dashboard</p>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <Card>
@@ -64,6 +107,7 @@ const ClientDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{clientLeads.length}</div>
+            <p className="text-sm text-muted-foreground">From all campaigns</p>
           </CardContent>
         </Card>
         
@@ -73,6 +117,7 @@ const ClientDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{appointmentRate}%</div>
+            <p className="text-sm text-muted-foreground">Leads that scheduled appointments</p>
           </CardContent>
         </Card>
         
@@ -82,6 +127,7 @@ const ClientDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{conversionRate}%</div>
+            <p className="text-sm text-muted-foreground">Leads that completed treatment</p>
           </CardContent>
         </Card>
       </div>
@@ -90,7 +136,8 @@ const ClientDashboard = () => {
         <TabsList className="mb-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="campaigns">Campaign Performance</TabsTrigger>
-          <TabsTrigger value="leads">Recent Leads</TabsTrigger>
+          <TabsTrigger value="leads">Your Leads</TabsTrigger>
+          <TabsTrigger value="trends">Trends</TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview">
@@ -117,7 +164,7 @@ const ClientDashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Active Campaigns</CardTitle>
+                <CardTitle>Your Active Campaigns</CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -186,7 +233,7 @@ const ClientDashboard = () => {
         <TabsContent value="leads">
           <Card>
             <CardHeader>
-              <CardTitle>Recent Leads</CardTitle>
+              <CardTitle>Your Recent Leads</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
@@ -220,6 +267,26 @@ const ClientDashboard = () => {
                   ))}
                 </TableBody>
               </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="trends">
+          <Card>
+            <CardHeader>
+              <CardTitle>Lead Trends (Last 30 Days)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trendData}>
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="leads" stroke="#1976d2" activeDot={{ r: 8 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

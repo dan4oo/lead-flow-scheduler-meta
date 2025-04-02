@@ -20,6 +20,15 @@ export type Appointment = {
   reminderSent: boolean;
 };
 
+export type Client = {
+  id: string;
+  name: string;
+  email: string;
+  clinics: string[];
+  dateAdded: Date;
+  status: 'active' | 'inactive';
+};
+
 export type Campaign = {
   id: string;
   name: string;
@@ -28,6 +37,7 @@ export type Campaign = {
   endDate?: Date;
   budget: number;
   status: 'active' | 'paused' | 'completed';
+  clientId: string;
 };
 
 export type Lead = {
