@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -43,13 +42,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 const ClientDashboard = () => {
-  // In a real app, this would come from auth context
-  // For this demo, we're using the clientId from localStorage
   const [clientId, setClientId] = useState('westside');
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [selectedCampaignLeads, setSelectedCampaignLeads] = useState<any[]>([]);
   
-  // Get the user role from localStorage (for the demo)
   useEffect(() => {
     const userRole = window.localStorage.getItem('userRole') || 'admin';
     if (userRole !== 'client') {
@@ -57,21 +53,17 @@ const ClientDashboard = () => {
     }
   }, []);
 
-  // Get client data
   const client = clients.find(c => c.id === clientId);
   
-  // Get campaigns and leads for the client
   const clientCampaigns = getCampaignsByClientId(clientId);
   const clientLeads = getLeadsByClientId(clientId);
   
-  // Fetch Facebook Ad Stats for selected campaign
   const { data: campaignStats, isLoading: isLoadingStats } = useQuery({
     queryKey: ['facebookAdStats', selectedCampaignId],
     queryFn: () => selectedCampaignId ? getFacebookAdStats(selectedCampaignId) : null,
     enabled: !!selectedCampaignId,
   });
   
-  // Update selected campaign leads when campaign changes
   useEffect(() => {
     if (selectedCampaignId) {
       const campaignMapping = {
@@ -80,7 +72,6 @@ const ClientDashboard = () => {
         'campaign3': 'fb-camp-3',
       };
       
-      // Find the original campaign ID from the Facebook campaign ID
       const originalCampaignId = Object.entries(campaignMapping).find(
         ([, fbId]) => fbId === selectedCampaignId
       )?.[0];
@@ -92,21 +83,18 @@ const ClientDashboard = () => {
     }
   }, [selectedCampaignId]);
   
-  // Data transformation for campaign performance
   const campaignLeadCounts = clientCampaigns.map(campaign => {
     const count = clientLeads.filter(lead => lead.campaignId === campaign.id).length;
     return {
       name: campaign.name,
       count,
       id: campaign.id,
-      // Add Facebook campaign ID mapping
       facebookCampaignId: campaign.id === 'campaign1' ? 'fb-camp-1' : 
                           campaign.id === 'campaign2' ? 'fb-camp-2' : 
                           campaign.id === 'campaign3' ? 'fb-camp-3' : undefined
     };
   });
   
-  // Calculate conversion metrics
   const totalLeads = clientLeads.length;
   const appointmentsScheduled = clientLeads.filter(lead => 
     lead.status === 'appointment_scheduled' || lead.status === 'closed_won'
@@ -116,12 +104,10 @@ const ClientDashboard = () => {
   const conversionRate = totalLeads ? Math.round((closedWon / totalLeads) * 100) : 0;
   const appointmentRate = totalLeads ? Math.round((appointmentsScheduled / totalLeads) * 100) : 0;
 
-  // Generate trend data for the last 30 days
   const generateTrendData = () => {
     const data = [];
     for (let i = 30; i >= 0; i--) {
       const date = subDays(new Date(), i);
-      // Count leads that were added on this date
       const leadsOnDate = clientLeads.filter(lead => 
         lead.dateAdded.getDate() === date.getDate() &&
         lead.dateAdded.getMonth() === date.getMonth() &&
@@ -138,7 +124,6 @@ const ClientDashboard = () => {
 
   const trendData = generateTrendData();
 
-  // Generate lead status distribution data
   const generateLeadStatusData = (leadsData) => {
     const statusCounts = {
       new: 0,
@@ -153,7 +138,6 @@ const ClientDashboard = () => {
       statusCounts[lead.status]++;
     });
     
-    // Filter out statuses with 0 count to prevent rendering issues
     return Object.entries(statusCounts)
       .filter(([_, count]) => count > 0)
       .map(([status, count]) => ({
@@ -165,10 +149,8 @@ const ClientDashboard = () => {
 
   const allLeadsStatusData = generateLeadStatusData(clientLeads);
   
-  // Generate selected campaign lead status data
   const selectedLeadsStatusData = generateLeadStatusData(selectedCampaignLeads);
 
-  // Colors for charts
   const COLORS = ['#1976d2', '#009688', '#ff9800', '#f44336', '#9c27b0', '#673ab7'];
   const STATUS_COLORS = {
     new: '#3b82f6',
@@ -179,22 +161,18 @@ const ClientDashboard = () => {
     closed_lost: '#ef4444'
   };
 
-  // Format date for display
   const formatDate = (dateString: Date) => {
     const date = new Date(dateString);
     return date.toLocaleDateString();
   };
 
-  // Handle campaign click
   const handleCampaignClick = (campaignId: string) => {
-    // Get Facebook campaign ID
     const campaign = campaignLeadCounts.find(c => c.id === campaignId);
     if (campaign?.facebookCampaignId) {
       setSelectedCampaignId(campaign.facebookCampaignId);
     }
   };
 
-  // Campaign bar chart with clickable bars
   const CampaignBarChart = () => (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={campaignLeadCounts}>
@@ -211,13 +189,11 @@ const ClientDashboard = () => {
     </ResponsiveContainer>
   );
 
-  // Get campaign name for a lead
   const getCampaignName = (campaignId: string) => {
     const campaign = campaigns.find(c => c.id === campaignId);
     return campaign?.name || 'Unknown Campaign';
   };
 
-  // Calculate appointments by campaign
   const appointmentsByCampaign = clientCampaigns.map(campaign => {
     const campaignLeads = clientLeads.filter(lead => lead.campaignId === campaign.id);
     const appointmentsCount = campaignLeads.filter(lead => 
@@ -232,7 +208,6 @@ const ClientDashboard = () => {
     };
   });
 
-  // Calculate billing information
   const getCurrentMonth = () => {
     const date = new Date();
     return format(date, 'MMMM yyyy');
@@ -248,7 +223,6 @@ const ClientDashboard = () => {
                            campaign.id === 'campaign2' ? 'fb-camp-2' : 
                            campaign.id === 'campaign3' ? 'fb-camp-3' : null;
       
-      // In a real app, we would fetch this data from the Facebook API
       if (fbCampaignId) {
         const stats = {
           'fb-camp-1': { spend: 1037.29, leads: 32 },
@@ -262,7 +236,6 @@ const ClientDashboard = () => {
         }
       }
       
-      // Count appointments
       const campaignLeads = clientLeads.filter(lead => lead.campaignId === campaign.id);
       totalAppointments += campaignLeads.filter(lead => 
         lead.status === 'appointment_scheduled' || lead.status === 'closed_won'
@@ -284,15 +257,13 @@ const ClientDashboard = () => {
 
   const billingInfo = calculateBilling();
 
-  // Handle client account switch
   const handleClientSwitch = (newClientId: string) => {
     setClientId(newClientId);
     setSelectedCampaignId(null);
     setSelectedCampaignLeads([]);
   };
 
-  // Custom PieChart renderer to prevent rendering issues with empty data
-  const SafePieChart = ({ data, dataKey, nameKey, children, ...props }) => {
+  const SafePieChart = ({ data, dataKey, nameKey, children = null, ...props }) => {
     if (!data || data.length === 0) {
       return (
         <div className="flex items-center justify-center h-full">
