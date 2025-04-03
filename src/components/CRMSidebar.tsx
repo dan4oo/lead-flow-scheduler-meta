@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -15,9 +15,17 @@ import {
   UserCircle,
   LineChart,
   Briefcase,
-  CreditCard
+  CreditCard,
+  Phone,
+  FileText,
+  HelpCircle,
+  Bell
 } from 'lucide-react';
 import { clients } from '@/data/mockData';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 
 type SidebarProps = {
   isOpen: boolean;
@@ -26,6 +34,8 @@ type SidebarProps = {
 
 const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
   const location = useLocation();
+  const { toast } = useToast();
+  const [unreadNotifications, setUnreadNotifications] = useState(3);
   
   // In a real app, this would come from your auth context
   const userRole = window.localStorage.getItem('userRole') || 'admin';
@@ -46,12 +56,15 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
     { icon: LineChart, label: 'Campaign Performance', path: '/client-dashboard?tab=campaigns' },
     { icon: Briefcase, label: 'My Leads', path: '/client-dashboard?tab=leads' },
     { icon: CreditCard, label: 'Billing', path: '/client-dashboard?tab=billing' },
+    { icon: MessageSquare, label: 'Support Chat', path: '/client-dashboard?tab=support', onClick: () => toast({ title: "Support Chat", description: "This feature is coming soon!" }) },
+    { icon: Phone, label: 'Schedule Call', path: '/client-dashboard?tab=schedule', onClick: () => toast({ title: "Schedule Call", description: "Contact your account manager directly to schedule a call." }) },
+    { icon: FileText, label: 'Documentation', path: '/client-dashboard?tab=docs', onClick: () => toast({ title: "Documentation", description: "Documentation materials are being prepared for your account." }) },
   ];
   
   const mainNav = userRole === 'client' ? clientNav : adminNav;
   
   const secondaryNav = userRole === 'client' 
-    ? [] 
+    ? [{ icon: HelpCircle, label: 'Help & Support', path: '/help', onClick: () => toast({ title: "Help & Support", description: "Our support team is available Monday-Friday 9AM-5PM." }) }] 
     : [{ icon: Settings, label: 'Settings', path: '/settings' }];
   
   const isActive = (path: string) => {
@@ -70,6 +83,14 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
     const newRole = userRole === 'admin' ? 'client' : 'admin';
     window.localStorage.setItem('userRole', newRole);
     window.location.href = newRole === 'admin' ? '/' : '/client-dashboard';
+  };
+
+  const clearNotifications = () => {
+    setUnreadNotifications(0);
+    toast({
+      title: "Notifications cleared",
+      description: "You have no new notifications",
+    });
   };
 
   return (
@@ -111,12 +132,40 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
         <div className="flex flex-col flex-1 pt-5 pb-4 overflow-y-auto">
           {userRole === 'client' && (
             <div className="px-4 mb-4">
-              <div className="text-sm font-medium text-sidebar-foreground/70 mb-1">
-                Client Account
+              <div className="flex items-center space-x-2 mb-2">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src="/placeholder.svg" alt={client?.name} />
+                  <AvatarFallback>{client?.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <div className="text-sm font-medium text-sidebar-foreground mb-1">
+                    Client Account
+                  </div>
+                  <div className="text-sidebar-foreground font-medium">
+                    {client?.name || 'Client Dashboard'}
+                  </div>
+                </div>
               </div>
-              <div className="text-sidebar-foreground font-medium">
-                {client?.name || 'Client Dashboard'}
-              </div>
+              
+              {/* Notifications */}
+              {userRole === 'client' && (
+                <div className="mt-3 flex items-center justify-between">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full text-sidebar-foreground text-sm justify-start"
+                    onClick={clearNotifications}
+                  >
+                    <Bell className="mr-2 h-4 w-4" />
+                    Notifications
+                    {unreadNotifications > 0 && (
+                      <Badge className="ml-auto bg-destructive hover:bg-destructive/80">
+                        {unreadNotifications}
+                      </Badge>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
           
@@ -131,6 +180,7 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
                     ? "bg-sidebar-accent text-sidebar-foreground"
                     : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                 )}
+                onClick={item.onClick}
               >
                 <item.icon className="mr-3 h-5 w-5" />
                 {item.label}
@@ -150,6 +200,7 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
                       ? "bg-sidebar-accent text-sidebar-foreground"
                       : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                   )}
+                  onClick={item.onClick}
                 >
                   <item.icon className="mr-3 h-5 w-5" />
                   {item.label}
@@ -174,18 +225,28 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
             </div>
             <div className="ml-auto flex">
               {/* Demo toggle button - in a real app this would be handled by auth system */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRoleToggle}
-                className="text-xs text-sidebar-foreground hover:text-white hover:bg-sidebar-accent"
-              >
-                Switch to {userRole === 'admin' ? 'Client' : 'Admin'}
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRoleToggle}
+                      className="text-xs text-sidebar-foreground hover:text-white hover:bg-sidebar-accent"
+                    >
+                      Switch to {userRole === 'admin' ? 'Client' : 'Admin'}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Demo feature to switch between roles</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <Button
                 variant="ghost"
                 size="icon"
                 className="text-sidebar-foreground hover:text-white hover:bg-sidebar-accent"
+                onClick={() => toast({ title: "Logout", description: "This is a demo application. No actual logout occurs." })}
               >
                 <LogOut className="h-5 w-5" />
               </Button>

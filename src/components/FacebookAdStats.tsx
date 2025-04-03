@@ -3,6 +3,8 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FacebookAdStats } from '@/types/crm';
 import { format } from 'date-fns';
+import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type FacebookAdStatsCardProps = {
   stats: FacebookAdStats;
@@ -19,7 +21,16 @@ const FacebookAdStatsCard = ({ stats, isLoading }: FacebookAdStatsCardProps) => 
         <CardContent>
           <div className="space-y-4">
             <div className="flex flex-col space-y-1.5">
-              <p className="text-sm text-muted-foreground">Loading campaign metrics...</p>
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {Array(8).fill(0).map((_, i) => (
+                <div key={i} className="flex flex-col space-y-1.5">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-8 w-16" />
+                </div>
+              ))}
             </div>
           </div>
         </CardContent>
