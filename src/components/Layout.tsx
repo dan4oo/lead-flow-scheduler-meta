@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import CRMSidebar from './CRMSidebar';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -8,11 +8,16 @@ import { useIsMobile } from '@/hooks/use-mobile';
 const Layout = () => {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
+  const location = useLocation();
+  
+  // Get user role from localStorage
+  const userRole = window.localStorage.getItem('userRole') || 'admin';
+  const isClientDashboard = userRole === 'client' || location.pathname.includes('client-dashboard');
   
   // Update sidebar state when screen size changes
   useEffect(() => {
-    setSidebarOpen(!isMobile);
-  }, [isMobile]);
+    setSidebarOpen(!isMobile && !isClientDashboard);
+  }, [isMobile, isClientDashboard]);
   
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -24,7 +29,8 @@ const Layout = () => {
       
       <div className={cn(
         "flex-1 transition-all duration-300 ease-in-out",
-        sidebarOpen ? "lg:ml-64" : "lg:ml-0"
+        sidebarOpen && !isClientDashboard ? "lg:ml-64" : "lg:ml-0",
+        isClientDashboard ? "w-full" : ""
       )}>
         <main className="min-h-screen">
           <Outlet />

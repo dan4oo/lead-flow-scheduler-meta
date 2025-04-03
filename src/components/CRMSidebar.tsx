@@ -12,19 +12,11 @@ import {
   Settings, 
   LogOut,
   Menu,
-  UserCircle,
-  LineChart,
-  Briefcase,
-  CreditCard,
-  Phone,
-  FileText,
-  HelpCircle,
-  Bell
+  UserCircle
 } from 'lucide-react';
 import { clients } from '@/data/mockData';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 
 type SidebarProps = {
@@ -35,13 +27,14 @@ type SidebarProps = {
 const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
   const location = useLocation();
   const { toast } = useToast();
-  const [unreadNotifications, setUnreadNotifications] = useState(3);
   
   // In a real app, this would come from your auth context
   const userRole = window.localStorage.getItem('userRole') || 'admin';
-  // For demo purposes, use westside client in client role
-  const clientId = 'westside';
-  const client = clients.find(c => c.id === clientId);
+  
+  // For client role, don't render the sidebar at all
+  if (userRole === 'client') {
+    return null;
+  }
   
   const adminNav = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
@@ -51,28 +44,12 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
     { icon: BarChart, label: 'Reports', path: '/reports' },
   ];
   
-  const clientNav = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/client-dashboard' },
-    { icon: LineChart, label: 'Campaign Performance', path: '/client-dashboard?tab=campaigns' },
-    { icon: Briefcase, label: 'My Leads', path: '/client-dashboard?tab=leads' },
-    { icon: CreditCard, label: 'Billing', path: '/client-dashboard?tab=billing' },
-    { icon: MessageSquare, label: 'Support Chat', path: '/client-dashboard?tab=support', onClick: () => toast({ title: "Support Chat", description: "This feature is coming soon!" }) },
-    { icon: Phone, label: 'Schedule Call', path: '/client-dashboard?tab=schedule', onClick: () => toast({ title: "Schedule Call", description: "Contact your account manager directly to schedule a call." }) },
-    { icon: FileText, label: 'Documentation', path: '/client-dashboard?tab=docs', onClick: () => toast({ title: "Documentation", description: "Documentation materials are being prepared for your account." }) },
+  const secondaryNav = [
+    { icon: Settings, label: 'Settings', path: '/settings' }
   ];
-  
-  const mainNav = userRole === 'client' ? clientNav : adminNav;
-  
-  const secondaryNav = userRole === 'client' 
-    ? [{ icon: HelpCircle, label: 'Help & Support', path: '/help', onClick: () => toast({ title: "Help & Support", description: "Our support team is available Monday-Friday 9AM-5PM." }) }] 
-    : [{ icon: Settings, label: 'Settings', path: '/settings' }];
   
   const isActive = (path: string) => {
     if (path === '/' && location.pathname === '/') return true;
-    if (path.includes('?')) {
-      const pathPart = path.split('?')[0];
-      return location.pathname.startsWith(pathPart);
-    }
     if (path !== '/' && location.pathname.startsWith(path)) return true;
     return false;
   };
@@ -83,14 +60,6 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
     const newRole = userRole === 'admin' ? 'client' : 'admin';
     window.localStorage.setItem('userRole', newRole);
     window.location.href = newRole === 'admin' ? '/' : '/client-dashboard';
-  };
-
-  const clearNotifications = () => {
-    setUnreadNotifications(0);
-    toast({
-      title: "Notifications cleared",
-      description: "You have no new notifications",
-    });
   };
 
   return (
@@ -130,47 +99,8 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
         </div>
         
         <div className="flex flex-col flex-1 pt-5 pb-4 overflow-y-auto">
-          {userRole === 'client' && (
-            <div className="px-4 mb-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src="/placeholder.svg" alt={client?.name} />
-                  <AvatarFallback>{client?.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="text-sm font-medium text-sidebar-foreground mb-1">
-                    Client Account
-                  </div>
-                  <div className="text-sidebar-foreground font-medium">
-                    {client?.name || 'Client Dashboard'}
-                  </div>
-                </div>
-              </div>
-              
-              {/* Notifications */}
-              {userRole === 'client' && (
-                <div className="mt-3 flex items-center justify-between">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="w-full text-sidebar-foreground text-sm justify-start"
-                    onClick={clearNotifications}
-                  >
-                    <Bell className="mr-2 h-4 w-4" />
-                    Notifications
-                    {unreadNotifications > 0 && (
-                      <Badge className="ml-auto bg-destructive hover:bg-destructive/80">
-                        {unreadNotifications}
-                      </Badge>
-                    )}
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-          
           <nav className="flex-1 px-2 space-y-1">
-            {mainNav.map((item) => (
+            {adminNav.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
@@ -180,7 +110,6 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
                     ? "bg-sidebar-accent text-sidebar-foreground"
                     : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                 )}
-                onClick={item.onClick}
               >
                 <item.icon className="mr-3 h-5 w-5" />
                 {item.label}
@@ -200,7 +129,6 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
                       ? "bg-sidebar-accent text-sidebar-foreground"
                       : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                   )}
-                  onClick={item.onClick}
                 >
                   <item.icon className="mr-3 h-5 w-5" />
                   {item.label}
@@ -217,10 +145,10 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-sidebar-foreground">
-                {userRole === 'admin' ? 'Admin User' : `${client?.name}`}
+                Admin User
               </p>
               <p className="text-xs text-sidebar-foreground/80">
-                {userRole === 'admin' ? 'admin@example.com' : client?.email}
+                admin@example.com
               </p>
             </div>
             <div className="ml-auto flex">
@@ -234,7 +162,7 @@ const CRMSidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
                       onClick={handleRoleToggle}
                       className="text-xs text-sidebar-foreground hover:text-white hover:bg-sidebar-accent"
                     >
-                      Switch to {userRole === 'admin' ? 'Client' : 'Admin'}
+                      Switch to Client
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
