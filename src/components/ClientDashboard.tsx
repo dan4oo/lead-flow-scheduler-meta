@@ -10,7 +10,19 @@ import {
   getLeadsByClientId,
   getLeadsByCampaign 
 } from '@/data/mockData';
-import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  Tooltip as RechartsTooltip, 
+  ResponsiveContainer, 
+  PieChart, 
+  Pie, 
+  Cell, 
+  LineChart, 
+  Line 
+} from 'recharts';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format, subDays } from 'date-fns';
@@ -188,7 +200,7 @@ const ClientDashboard = () => {
       <BarChart data={campaignLeadCounts}>
         <XAxis dataKey="name" />
         <YAxis />
-        <Tooltip />
+        <RechartsTooltip />
         <Bar 
           dataKey="count" 
           fill="#1976d2"
@@ -312,6 +324,7 @@ const ClientDashboard = () => {
           ))}
         </Pie>
         <RechartsTooltip />
+        {children}
       </PieChart>
     );
   };
@@ -659,7 +672,7 @@ const ClientDashboard = () => {
                   <LineChart data={trendData}>
                     <XAxis dataKey="date" />
                     <YAxis />
-                    <Tooltip />
+                    <RechartsTooltip />
                     <Line type="monotone" dataKey="leads" stroke="#1976d2" activeDot={{ r: 8 }} />
                   </LineChart>
                 </ResponsiveContainer>
