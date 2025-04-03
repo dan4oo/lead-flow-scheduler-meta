@@ -25,12 +25,11 @@ const Layout = () => {
 
   return (
     <div className="min-h-screen bg-background flex">
-      <CRMSidebar isOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
+      {!isClientDashboard && <CRMSidebar isOpen={sidebarOpen} toggleSidebar={toggleSidebar} />}
       
       <div className={cn(
         "flex-1 transition-all duration-300 ease-in-out",
-        sidebarOpen && !isClientDashboard ? "lg:ml-64" : "lg:ml-0",
-        isClientDashboard ? "w-full" : ""
+        !isClientDashboard && sidebarOpen ? "lg:ml-64" : "lg:ml-0",
       )}>
         <main className="min-h-screen">
           <Outlet />

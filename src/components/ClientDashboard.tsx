@@ -10,7 +10,7 @@ import {
   getLeadsByClientId,
   getLeadsByCampaign 
 } from '@/data/mockData';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format, subDays } from 'date-fns';
@@ -19,6 +19,16 @@ import { getFacebookAdStats } from '@/services/FacebookAdsService';
 import FacebookAdStatsCard from './FacebookAdStats';
 import { ChartContainer, ChartTooltipContent, ChartTooltip } from '@/components/ui/chart';
 import { LeadStatus } from '@/types/crm';
+import { Button } from '@/components/ui/button';
+import { UserCircle, Users } from 'lucide-react';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 
 const ClientDashboard = () => {
   // In a real app, this would come from auth context
@@ -131,11 +141,14 @@ const ClientDashboard = () => {
       statusCounts[lead.status]++;
     });
     
-    return Object.entries(statusCounts).map(([status, count]) => ({
-      name: status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      value: count,
-      status
-    }));
+    // Filter out statuses with 0 count to prevent rendering issues
+    return Object.entries(statusCounts)
+      .filter(([_, count]) => count > 0)
+      .map(([status, count]) => ({
+        name: status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        value: count,
+        status
+      }));
   };
 
   const allLeadsStatusData = generateLeadStatusData(clientLeads);
@@ -259,10 +272,81 @@ const ClientDashboard = () => {
 
   const billingInfo = calculateBilling();
 
+  // Handle client account switch
+  const handleClientSwitch = (newClientId: string) => {
+    setClientId(newClientId);
+    setSelectedCampaignId(null);
+    setSelectedCampaignLeads([]);
+  };
+
+  // Custom PieChart renderer to prevent rendering issues with empty data
+  const SafePieChart = ({ data, dataKey, nameKey, children, ...props }) => {
+    if (!data || data.length === 0) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">No data available</p>
+        </div>
+      );
+    }
+
+    return (
+      <PieChart {...props}>
+        <Pie
+          data={data}
+          cx="50%"
+          cy="50%"
+          labelLine={false}
+          outerRadius={80}
+          fill="#8884d8"
+          dataKey={dataKey}
+          nameKey={nameKey}
+          label={({name, percent}) => 
+            percent > 0 ? `${name} (${(percent * 100).toFixed(0)}%)` : null
+          }
+        >
+          {data.map((entry, index) => (
+            <Cell 
+              key={`cell-${index}`} 
+              fill={STATUS_COLORS[entry.status] || COLORS[index % COLORS.length]} 
+            />
+          ))}
+        </Pie>
+        <RechartsTooltip />
+      </PieChart>
+    );
+  };
+
   return (
     <div className="p-6">
-      <h1 className="text-3xl font-bold mb-2">{client?.name || 'Client'} Dashboard</h1>
-      <p className="text-muted-foreground mb-6">Welcome to your campaign performance dashboard</p>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">{client?.name || 'Client'} Dashboard</h1>
+          <p className="text-muted-foreground">Welcome to your campaign performance dashboard</p>
+        </div>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="ml-auto flex items-center gap-2">
+              <UserCircle className="h-4 w-4" />
+              Switch Account
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Select Account</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {clients.map(clientOption => (
+              <DropdownMenuItem
+                key={clientOption.id}
+                onClick={() => handleClientSwitch(clientOption.id)}
+                className={clientId === clientOption.id ? "bg-accent text-accent-foreground" : ""}
+              >
+                <Users className="mr-2 h-4 w-4" />
+                {clientOption.name}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <Card>
@@ -326,23 +410,11 @@ const ClientDashboard = () => {
               <CardContent>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={allLeadsStatusData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({name, percent}) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                      >
-                        {allLeadsStatusData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.status] || COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
+                    <SafePieChart
+                      data={allLeadsStatusData}
+                      dataKey="value"
+                      nameKey="name"
+                    />
                   </ResponsiveContainer>
                 </div>
               </CardContent>
@@ -367,23 +439,11 @@ const ClientDashboard = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={selectedLeadsStatusData}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              outerRadius={80}
-                              fill="#8884d8"
-                              dataKey="value"
-                              label={({name, percent}) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                            >
-                              {selectedLeadsStatusData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.status] || COLORS[index % COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip />
-                          </PieChart>
+                          <SafePieChart
+                            data={selectedLeadsStatusData}
+                            dataKey="value"
+                            nameKey="name"
+                          />
                         </ResponsiveContainer>
                       </div>
                       <div>
@@ -498,23 +558,11 @@ const ClientDashboard = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="h-80">
                       <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={selectedLeadsStatusData}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            outerRadius={80}
-                            fill="#8884d8"
-                            dataKey="value"
-                            label={({name, percent}) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                          >
-                            {selectedLeadsStatusData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.status] || COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                        </PieChart>
+                        <SafePieChart
+                          data={selectedLeadsStatusData}
+                          dataKey="value"
+                          nameKey="name"
+                        />
                       </ResponsiveContainer>
                     </div>
                     <div>
