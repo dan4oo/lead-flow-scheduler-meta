@@ -12,6 +12,8 @@ import CalendarView from "./components/CalendarView";
 import Settings from "./components/Settings";
 import NotFound from "./components/NotFound";
 import ClientDashboard from "./components/ClientDashboard";
+import ClientAccessCode from "./components/ClientAccessCode";
+import ClientConnect from "./components/ClientConnect";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +33,8 @@ const App = () => (
             <Route path="client-dashboard" element={<ClientDashboard />} />
             <Route path="*" element={<NotFound />} />
           </Route>
+          <Route path="client-access" element={<ClientAccessCode />} />
+          <Route path="client-connect" element={<ClientConnect />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>

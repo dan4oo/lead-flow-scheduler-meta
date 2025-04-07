@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,6 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PlusCircle, UserPlus } from 'lucide-react';
+import AdminClientCodes from './AdminClientCodes';
 
 const Settings = () => {
   const { toast } = useToast();
@@ -58,6 +58,7 @@ const Settings = () => {
           <TabsTrigger value="integrations">Integrations</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="client-codes">Client Codes</TabsTrigger>
         </TabsList>
         
         <TabsContent value="general">
@@ -314,6 +315,10 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="client-codes">
+          <AdminClientCodes />
         </TabsContent>
       </Tabs>
     </div>
