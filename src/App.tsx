@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./components/AuthProvider";
 
 import Layout from "./components/Layout";
@@ -17,7 +17,9 @@ import ClientDashboard from "./components/ClientDashboard";
 import ClientAccessCode from "./components/ClientAccessCode";
 import ClientConnect from "./components/ClientConnect";
 import ProtectedRoute from "./components/ProtectedRoute";
-import Login from "./components/Login";
+import AdminLogin from "./components/AdminLogin";
+import ClientLogin from "./components/ClientLogin";
+import ClientRegister from "./components/ClientRegister";
 
 const queryClient = new QueryClient();
 
@@ -29,8 +31,15 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            {/* Public routes */}
-            <Route path="/login" element={<Login />} />
+            {/* Redirect from login to client login */}
+            <Route path="/login" element={<Navigate to="/client/login" replace />} />
+            
+            {/* Admin routes */}
+            <Route path="/admin/login" element={<AdminLogin />} />
+            
+            {/* Client auth routes */}
+            <Route path="/client/login" element={<ClientLogin />} />
+            <Route path="/client/register" element={<ClientRegister />} />
             
             {/* Protected admin routes */}
             <Route element={<ProtectedRoute />}>
