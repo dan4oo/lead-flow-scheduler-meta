@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { PlusCircle, Copy, Trash2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,56 +11,73 @@ import { Input } from '@/components/ui/input';
 interface ClientCode {
   id: string;
   code: string;
-  clientName: string;
-  created: Date;
+  client_name: string;
+  created_at: string;
   status: 'unused' | 'active';
 }
 
 const AdminClientCodes: React.FC = () => {
-  const [clientCodes, setClientCodes] = useState<ClientCode[]>([
-    {
-      id: '1',
-      code: '123456',
-      clientName: 'Acme Corporation',
-      created: new Date('2023-10-15'),
-      status: 'active'
-    },
-    {
-      id: '2',
-      code: '654321',
-      clientName: 'Beta Industries',
-      created: new Date('2023-11-01'),
-      status: 'unused'
-    }
-  ]);
-  
+  const [clientCodes, setClientCodes] = useState<ClientCode[]>([]);
   const [newClientName, setNewClientName] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Load client codes from Supabase
+  useEffect(() => {
+    const fetchClientCodes = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('access_codes')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        setClientCodes(data || []);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error fetching client codes:', error);
+        toast.error('Failed to load access codes');
+        setIsLoading(false);
+      }
+    };
+    
+    fetchClientCodes();
+  }, []);
   
   const generateRandomCode = (): string => {
     return Math.floor(100000 + Math.random() * 900000).toString();
   };
   
-  const handleGenerateCode = () => {
+  const handleGenerateCode = async () => {
     if (!newClientName.trim()) {
       toast.error('Please enter a client name');
       return;
     }
     
     const newCode = generateRandomCode();
-    const newClientCode: ClientCode = {
-      id: Date.now().toString(),
-      code: newCode,
-      clientName: newClientName,
-      created: new Date(),
-      status: 'unused'
-    };
     
-    setClientCodes([...clientCodes, newClientCode]);
-    setNewClientName('');
-    
-    toast.success('Access code generated', {
-      description: `Code for ${newClientName}: ${newCode}`
-    });
+    try {
+      const { data, error } = await supabase
+        .from('access_codes')
+        .insert({
+          code: newCode,
+          client_name: newClientName,
+          status: 'unused'
+        })
+        .select();
+      
+      if (error) throw error;
+      
+      setClientCodes([data[0], ...clientCodes]);
+      setNewClientName('');
+      
+      toast.success('Access code generated', {
+        description: `Code for ${newClientName}: ${newCode}`
+      });
+    } catch (error) {
+      console.error('Error generating access code:', error);
+      toast.error('Failed to generate access code');
+    }
   };
   
   const handleCopyCode = (code: string) => {
@@ -67,9 +85,21 @@ const AdminClientCodes: React.FC = () => {
     toast.success('Code copied to clipboard');
   };
   
-  const handleDeleteCode = (id: string) => {
-    setClientCodes(clientCodes.filter(code => code.id !== id));
-    toast.success('Access code deleted');
+  const handleDeleteCode = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('access_codes')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      setClientCodes(clientCodes.filter(code => code.id !== id));
+      toast.success('Access code deleted');
+    } catch (error) {
+      console.error('Error deleting access code:', error);
+      toast.error('Failed to delete access code');
+    }
   };
   
   return (
@@ -98,7 +128,11 @@ const AdminClientCodes: React.FC = () => {
           </div>
         </div>
         
-        {clientCodes.length > 0 ? (
+        {isLoading ? (
+          <div className="flex h-32 items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+          </div>
+        ) : clientCodes.length > 0 ? (
           <div className="rounded-md border">
             <div className="grid grid-cols-12 items-center border-b bg-muted/50 px-4 py-3 text-sm font-medium">
               <div className="col-span-3">Client</div>
@@ -114,7 +148,7 @@ const AdminClientCodes: React.FC = () => {
                 className="grid grid-cols-12 items-center border-b px-4 py-3 text-sm last:border-0"
               >
                 <div className="col-span-3 font-medium">
-                  {clientCode.clientName}
+                  {clientCode.client_name}
                 </div>
                 <div className="col-span-3">
                   <code className="rounded bg-muted px-2 py-1">
@@ -122,7 +156,7 @@ const AdminClientCodes: React.FC = () => {
                   </code>
                 </div>
                 <div className="col-span-3 text-muted-foreground">
-                  {clientCode.created.toLocaleDateString()}
+                  {new Date(clientCode.created_at).toLocaleDateString()}
                 </div>
                 <div className="col-span-2">
                   <span

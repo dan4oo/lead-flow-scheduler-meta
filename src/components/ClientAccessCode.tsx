@@ -1,10 +1,12 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "./AuthProvider";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,9 +23,6 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 
-// Mock access codes - in a real app, these would be stored in a database
-const VALID_ACCESS_CODES = ["123456", "654321", "111222"];
-
 const formSchema = z.object({
   accessCode: z.string().length(6, {
     message: "Access code must be 6 characters.",
@@ -32,6 +31,7 @@ const formSchema = z.object({
 
 const ClientAccessCode: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -40,11 +40,57 @@ const ClientAccessCode: React.FC = () => {
     },
   });
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    if (VALID_ACCESS_CODES.includes(values.accessCode)) {
-      // Store access code in localStorage for session management
-      localStorage.setItem("clientAccessCode", values.accessCode);
-      localStorage.setItem("clientAuthenticated", "true");
+  // Check if client has already verified their access code
+  useEffect(() => {
+    const checkClientVerification = async () => {
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from('client_verifications')
+        .select('is_verified')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (data?.is_verified) {
+        // Client is already verified, redirect to connection page
+        navigate('/client-connect');
+      }
+    };
+    
+    checkClientVerification();
+  }, [user, navigate]);
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!user) return;
+    
+    try {
+      // Check if code exists and is valid
+      const { data: codeData, error: codeError } = await supabase
+        .from('access_codes')
+        .select('*')
+        .eq('code', values.accessCode)
+        .eq('status', 'unused')
+        .single();
+      
+      if (codeError || !codeData) {
+        toast.error("Invalid access code", {
+          description: "Please check your code and try again.",
+        });
+        return;
+      }
+      
+      // Update the access code status to active
+      await supabase
+        .from('access_codes')
+        .update({ status: 'active', used_by: user.id })
+        .eq('id', codeData.id);
+      
+      // Record that this client has verified their access
+      await supabase.from('client_verifications').upsert({
+        user_id: user.id,
+        is_verified: true,
+        access_code_id: codeData.id
+      });
       
       toast.success("Access code verified", {
         description: "Redirecting to account setup...",
@@ -52,9 +98,11 @@ const ClientAccessCode: React.FC = () => {
       
       // Navigate to account connection page
       navigate("/client-connect");
-    } else {
-      toast.error("Invalid access code", {
-        description: "Please check your code and try again.",
+      
+    } catch (error) {
+      console.error('Error verifying access code:', error);
+      toast.error("An error occurred", {
+        description: "Please try again later.",
       });
     }
   };
