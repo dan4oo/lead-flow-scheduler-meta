@@ -29,6 +29,9 @@ const formSchema = z.object({
   }),
 });
 
+// Define the default access code constant
+const DEFAULT_ACCESS_CODE = '123456';
+
 const ClientAccessCode: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -64,7 +67,71 @@ const ClientAccessCode: React.FC = () => {
     if (!user) return;
     
     try {
-      // Check if code exists and is valid
+      // Check if code is the default code or exists in the database
+      if (values.accessCode === DEFAULT_ACCESS_CODE) {
+        // For default code, check if it exists in the database
+        const { data: defaultCode, error: defaultCodeError } = await supabase
+          .from('access_codes')
+          .select('*')
+          .eq('code', DEFAULT_ACCESS_CODE)
+          .single();
+        
+        if (defaultCodeError && defaultCodeError.code !== 'PGRST116') {
+          // If error is not "no rows returned", then it's a different error
+          console.error('Error checking default code:', defaultCodeError);
+          toast.error("An error occurred while verifying access code");
+          return;
+        }
+        
+        // If default code doesn't exist in database, create it
+        let codeId;
+        if (!defaultCode) {
+          const { data: newDefaultCode, error: createError } = await supabase
+            .from('access_codes')
+            .insert({
+              code: DEFAULT_ACCESS_CODE,
+              client_name: 'Default Client',
+              status: 'unused'
+            })
+            .select()
+            .single();
+          
+          if (createError) {
+            console.error('Error creating default code:', createError);
+            toast.error("Failed to create default access code");
+            return;
+          }
+          
+          codeId = newDefaultCode.id;
+        } else {
+          codeId = defaultCode.id;
+          
+          // Update the default code status if it was unused
+          if (defaultCode.status === 'unused') {
+            await supabase
+              .from('access_codes')
+              .update({ status: 'active', used_by: user.id })
+              .eq('id', codeId);
+          }
+        }
+        
+        // Record that this client has verified their access using default code
+        await supabase.from('client_verifications').upsert({
+          user_id: user.id,
+          is_verified: true,
+          access_code_id: codeId
+        });
+        
+        toast.success("Default access code accepted", {
+          description: "Redirecting to account setup...",
+        });
+        
+        // Navigate to account connection page
+        navigate("/client-connect");
+        return;
+      }
+      
+      // For non-default codes, check if code exists and is valid
       const { data: codeData, error: codeError } = await supabase
         .from('access_codes')
         .select('*')
@@ -114,6 +181,9 @@ const ClientAccessCode: React.FC = () => {
           <h1 className="text-3xl font-bold">Client Access</h1>
           <p className="text-gray-500">
             Enter the access code provided by your account manager.
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            (Hint: Try default code: {DEFAULT_ACCESS_CODE})
           </p>
         </div>
 

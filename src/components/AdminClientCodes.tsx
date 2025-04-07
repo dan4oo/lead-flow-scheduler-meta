@@ -16,12 +16,14 @@ interface ClientCode {
   status: 'unused' | 'active';
 }
 
+const DEFAULT_ACCESS_CODE = '123456';
+
 const AdminClientCodes: React.FC = () => {
   const [clientCodes, setClientCodes] = useState<ClientCode[]>([]);
   const [newClientName, setNewClientName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   
-  // Load client codes from Supabase
+  // Load client codes from Supabase and check if default code exists
   useEffect(() => {
     const fetchClientCodes = async () => {
       try {
@@ -33,6 +35,15 @@ const AdminClientCodes: React.FC = () => {
         if (error) throw error;
         
         setClientCodes(data || []);
+        
+        // Check if default code exists
+        const defaultCodeExists = data?.some(code => code.code === DEFAULT_ACCESS_CODE);
+        
+        // If default code doesn't exist, create it
+        if (!defaultCodeExists) {
+          createDefaultCode();
+        }
+        
         setIsLoading(false);
       } catch (error) {
         console.error('Error fetching client codes:', error);
@@ -43,6 +54,31 @@ const AdminClientCodes: React.FC = () => {
     
     fetchClientCodes();
   }, []);
+  
+  const createDefaultCode = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('access_codes')
+        .insert({
+          code: DEFAULT_ACCESS_CODE,
+          client_name: 'Default Client',
+          status: 'unused'
+        })
+        .select();
+      
+      if (error) throw error;
+      
+      if (data) {
+        setClientCodes(prevCodes => [data[0], ...prevCodes]);
+        toast.success('Default access code created', {
+          description: `Code: ${DEFAULT_ACCESS_CODE}`
+        });
+      }
+    } catch (error) {
+      console.error('Error creating default code:', error);
+      toast.error('Failed to create default access code');
+    }
+  };
   
   const generateRandomCode = (): string => {
     return Math.floor(100000 + Math.random() * 900000).toString();
