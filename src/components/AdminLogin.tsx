@@ -18,7 +18,11 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, UserCircle2 } from "lucide-react";
+
+// Default admin account credentials
+export const DEFAULT_ADMIN_EMAIL = "admin@example.com";
+export const DEFAULT_ADMIN_PASSWORD = "admin123";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -35,9 +39,28 @@ const AdminLogin: React.FC = () => {
       password: "",
     },
   });
+  
+  // Function to use default admin credentials
+  const useDefaultCredentials = () => {
+    form.setValue("email", DEFAULT_ADMIN_EMAIL);
+    form.setValue("password", DEFAULT_ADMIN_PASSWORD);
+  };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
+      // For the default admin account, bypass authentication and just log in
+      if (values.email === DEFAULT_ADMIN_EMAIL && values.password === DEFAULT_ADMIN_PASSWORD) {
+        localStorage.setItem('userRole', 'admin');
+        localStorage.setItem('adminAuthenticated', 'true');
+        
+        toast.success("Admin login successful", {
+          description: "Accessing admin dashboard...",
+        });
+        
+        navigate('/');
+        return;
+      }
+      
       const { error } = await supabase.auth.signInWithPassword({
         email: values.email,
         password: values.password,
@@ -121,6 +144,25 @@ const AdminLogin: React.FC = () => {
 
               <Button type="submit" className="w-full">
                 Login as Administrator
+              </Button>
+              
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white px-2 text-gray-500">Or</span>
+                </div>
+              </div>
+              
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full"
+                onClick={useDefaultCredentials}
+              >
+                <UserCircle2 className="mr-2 h-4 w-4" />
+                Use Default Admin
               </Button>
             </form>
           </Form>

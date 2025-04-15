@@ -61,80 +61,30 @@ const ClientAccessCode: React.FC = () => {
     checkClientVerification();
   }, [user, navigate]);
 
+  // Auto-fill the default access code
+  const useDefaultAccessCode = () => {
+    form.setValue("accessCode", DEFAULT_ACCESS_CODE);
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!user) return;
     
     try {
-      // Check if code is the default code or exists in the database
+      // For the default access code, always verify
       if (values.accessCode === DEFAULT_ACCESS_CODE) {
-        // For default code, check if it exists in the database
-        const { data: defaultCode, error: defaultCodeError } = await supabase
-          .from('access_codes')
-          .select('*')
-          .eq('code', DEFAULT_ACCESS_CODE)
-          .single();
-        
-        let codeStatus = 'unused';
-        let codeId;
-        
-        if (defaultCodeError && defaultCodeError.code !== 'PGRST116') {
-          // If error is not "no rows returned", then it's a different error
-          console.error('Error checking default code:', defaultCodeError);
-          toast.error("An error occurred while verifying access code");
-          return;
-        }
-        
-        // If default code doesn't exist in database, create it
-        if (!defaultCode) {
-          const { data: newDefaultCode, error: createError } = await supabase
-            .from('access_codes')
-            .insert({
-              code: DEFAULT_ACCESS_CODE,
-              client_name: 'Default Client',
-              status: 'unused'
-            })
-            .select()
-            .single();
-          
-          if (createError) {
-            console.error('Error creating default code:', createError);
-            toast.error("Failed to create default access code");
-            return;
-          }
-          
-          codeId = newDefaultCode.id;
-        } else {
-          codeId = defaultCode.id;
-          codeStatus = defaultCode.status;
-          
-          // Check if code is already used
-          if (codeStatus === 'active' && defaultCode.used_by !== user.id) {
-            toast.error("Access code already used");
-            return;
-          }
-        }
-        
         // Record that this client has verified their access using default code
         const { error: verificationError } = await supabase
           .from('client_verifications')
           .upsert({
             user_id: user.id,
             is_verified: true,
-            access_code_id: codeId
+            access_code_id: "default"
           });
         
         if (verificationError) {
           console.error('Error saving verification:', verificationError);
           toast.error("Failed to save verification");
           return;
-        }
-        
-        // Update the default code status only after verification is successful
-        if (codeStatus === 'unused') {
-          await supabase
-            .from('access_codes')
-            .update({ status: 'active', used_by: user.id })
-            .eq('id', codeId);
         }
         
         toast.success("Default access code accepted", {
@@ -243,6 +193,24 @@ const ClientAccessCode: React.FC = () => {
 
             <Button type="submit" className="w-full">
               Verify Access Code
+            </Button>
+            
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-gray-500">Or</span>
+              </div>
+            </div>
+            
+            <Button 
+              type="button" 
+              variant="outline" 
+              className="w-full"
+              onClick={useDefaultAccessCode}
+            >
+              Use Default Code
             </Button>
           </form>
         </Form>

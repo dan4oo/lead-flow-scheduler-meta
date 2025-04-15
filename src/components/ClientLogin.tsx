@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { DEFAULT_CLIENT_EMAIL, DEFAULT_CLIENT_PASSWORD } from "./ClientRegister";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +19,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, Key } from "lucide-react";
+import { Mail, Key, UserCircle2 } from "lucide-react";
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -35,6 +36,12 @@ const ClientLogin: React.FC = () => {
       password: "",
     },
   });
+
+  // Function to use default test credentials
+  const useDefaultCredentials = () => {
+    form.setValue("email", DEFAULT_CLIENT_EMAIL);
+    form.setValue("password", DEFAULT_CLIENT_PASSWORD);
+  };
 
   const handleSubmit = async (values: z.infer<typeof loginFormSchema>) => {
     try {
@@ -113,6 +120,25 @@ const ClientLogin: React.FC = () => {
 
               <Button type="submit" className="w-full">
                 Log in
+              </Button>
+              
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white px-2 text-gray-500">Or</span>
+                </div>
+              </div>
+              
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full"
+                onClick={useDefaultCredentials}
+              >
+                <UserCircle2 className="mr-2 h-4 w-4" />
+                Use Test Account
               </Button>
             </form>
           </Form>

@@ -19,7 +19,11 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, Key } from "lucide-react";
+import { Mail, Key, UserCircle2 } from "lucide-react";
+
+// Add a default test account for client
+export const DEFAULT_CLIENT_EMAIL = "client@example.com";
+export const DEFAULT_CLIENT_PASSWORD = "password123";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -44,34 +48,69 @@ const ClientRegister: React.FC = () => {
     },
   });
 
+  // Function to use default test credentials
+  const useDefaultCredentials = () => {
+    form.setValue("email", DEFAULT_CLIENT_EMAIL);
+    form.setValue("password", DEFAULT_CLIENT_PASSWORD);
+    form.setValue("confirmPassword", DEFAULT_CLIENT_PASSWORD);
+    form.setValue("accessCode", DEFAULT_ACCESS_CODE);
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
+      // First check if user already exists
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('email', values.email)
+        .single();
+
+      if (existingUser) {
+        toast.error("Email already registered", {
+          description: "Please use a different email or login with your existing account",
+        });
+        return;
+      }
+
       // Check if access code exists and is unused
       const { data: accessCode, error: accessCodeError } = await supabase
         .from('access_codes')
         .select('*')
         .eq('code', values.accessCode)
-        .eq('status', 'unused')
         .single();
 
-      if (accessCodeError || !accessCode) {
-        if (values.accessCode === DEFAULT_ACCESS_CODE) {
-          // Special handling for default code
-          const { data: defaultCode } = await supabase
-            .from('access_codes')
-            .select('*')
-            .eq('code', DEFAULT_ACCESS_CODE)
-            .eq('status', 'unused')
-            .single();
-
-          if (!defaultCode) {
-            toast.error("Access code already used");
-            return;
+      // Special handling for default code (always allow it)
+      if (values.accessCode === DEFAULT_ACCESS_CODE) {
+        // Register the user
+        const { error: signUpError, data } = await supabase.auth.signUp({
+          email: values.email,
+          password: values.password,
+          options: {
+            data: {
+              role: 'client',
+            }
           }
-        } else {
-          toast.error("Invalid or used access code");
+        });
+
+        if (signUpError) {
+          toast.error("Registration failed", {
+            description: signUpError.message,
+          });
           return;
         }
+
+        toast.success("Registration successful", {
+          description: "Please log in with your credentials",
+        });
+        
+        navigate('/client/login');
+        return;
+      }
+
+      // If it's not the default code, check if it's a valid, unused code
+      if (accessCodeError || !accessCode || accessCode.status !== 'unused') {
+        toast.error("Invalid or used access code");
+        return;
       }
 
       // Register the user
@@ -203,6 +242,25 @@ const ClientRegister: React.FC = () => {
 
               <Button type="submit" className="w-full mt-6">
                 Create Account
+              </Button>
+              
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white px-2 text-gray-500">Or</span>
+                </div>
+              </div>
+              
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full"
+                onClick={useDefaultCredentials}
+              >
+                <UserCircle2 className="mr-2 h-4 w-4" />
+                Use Test Account
               </Button>
             </form>
           </Form>
