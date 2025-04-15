@@ -5,6 +5,7 @@ export interface ClientCode {
   client_name: string;
   created_at: string;
   status: 'unused' | 'active';
+  used_by?: string;
 }
 
 export const DEFAULT_ACCESS_CODE = '123456';

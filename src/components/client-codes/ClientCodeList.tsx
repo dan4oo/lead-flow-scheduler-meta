@@ -59,9 +59,9 @@ const ClientCodeList: React.FC<ClientCodeListProps> = ({
     <div className="rounded-md border">
       <div className="grid grid-cols-12 items-center border-b bg-muted/50 px-4 py-3 text-sm font-medium">
         <div className="col-span-3">Client</div>
-        <div className="col-span-3">Access Code</div>
+        <div className="col-span-2">Access Code</div>
         <div className="col-span-3">Created</div>
-        <div className="col-span-2">Status</div>
+        <div className="col-span-3">Status</div>
         <div className="col-span-1 text-right">Actions</div>
       </div>
       
@@ -73,7 +73,7 @@ const ClientCodeList: React.FC<ClientCodeListProps> = ({
           <div className="col-span-3 font-medium">
             {clientCode.client_name}
           </div>
-          <div className="col-span-3">
+          <div className="col-span-2">
             <code className="rounded bg-muted px-2 py-1">
               {clientCode.code}
             </code>
@@ -81,7 +81,7 @@ const ClientCodeList: React.FC<ClientCodeListProps> = ({
           <div className="col-span-3 text-muted-foreground">
             {new Date(clientCode.created_at).toLocaleDateString()}
           </div>
-          <div className="col-span-2">
+          <div className="col-span-3">
             <span
               className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
                 clientCode.status === 'active'
@@ -89,7 +89,9 @@ const ClientCodeList: React.FC<ClientCodeListProps> = ({
                   : 'bg-gray-100 text-gray-800'
               }`}
             >
-              {clientCode.status === 'active' ? 'Active' : 'Unused'}
+              {clientCode.status === 'active' 
+                ? `Used by ${clientCode.used_by?.split('@')[0]}` 
+                : 'Unused'}
             </span>
           </div>
           <div className="col-span-1 flex justify-end gap-2">
@@ -97,6 +99,7 @@ const ClientCodeList: React.FC<ClientCodeListProps> = ({
               variant="ghost"
               size="icon"
               onClick={() => handleCopyCode(clientCode.code)}
+              disabled={clientCode.status === 'active'}
             >
               <Copy className="h-4 w-4" />
               <span className="sr-only">Copy</span>

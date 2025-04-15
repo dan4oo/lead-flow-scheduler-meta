@@ -88,6 +88,21 @@ const ClientLogin: React.FC = () => {
         const email = `guest_${Date.now()}@example.com`;
         const password = `guest${Date.now()}`;
         
+        // Check if default code is already used
+        const { data: defaultCode, error: defaultCodeError } = await supabase
+          .from('access_codes')
+          .select('*')
+          .eq('code', DEFAULT_ACCESS_CODE)
+          .eq('status', 'unused')
+          .single();
+        
+        if (!defaultCode) {
+          toast.error("Access code already used", {
+            description: "This code has already been used by another client",
+          });
+          return;
+        }
+
         const { error: signUpError } = await supabase.auth.signUp({
           email,
           password,
@@ -101,6 +116,12 @@ const ClientLogin: React.FC = () => {
         if (signUpError) {
           throw signUpError;
         }
+
+        // Mark the code as used
+        await supabase
+          .from('access_codes')
+          .update({ status: 'active', used_by: email })
+          .eq('code', DEFAULT_ACCESS_CODE);
         
         localStorage.setItem('userRole', 'client');
         localStorage.setItem('guestLogin', 'true');
@@ -113,7 +134,7 @@ const ClientLogin: React.FC = () => {
         return;
       }
       
-      // For non-default codes
+      // For non-default codes, check if unused
       const { data, error } = await supabase
         .from('access_codes')
         .select()
@@ -122,8 +143,8 @@ const ClientLogin: React.FC = () => {
         .single();
       
       if (error || !data) {
-        toast.error("Invalid access code", {
-          description: "Please check your code and try again",
+        toast.error("Invalid or used access code", {
+          description: "This code may have already been used by another client",
         });
         return;
       }
@@ -145,6 +166,12 @@ const ClientLogin: React.FC = () => {
       if (signUpError) {
         throw signUpError;
       }
+
+      // Mark the code as used
+      await supabase
+        .from('access_codes')
+        .update({ status: 'active', used_by: email })
+        .eq('id', data.id);
       
       localStorage.setItem('userRole', 'client');
       localStorage.setItem('guestLogin', 'true');
