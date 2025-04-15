@@ -45,12 +45,27 @@ const ClientLogin: React.FC = () => {
 
   const handleSubmit = async (values: z.infer<typeof loginFormSchema>) => {
     try {
+      // Check if using default test account
+      if (values.email === DEFAULT_CLIENT_EMAIL && values.password === DEFAULT_CLIENT_PASSWORD) {
+        // For the default client account, bypass actual authentication
+        localStorage.setItem('userRole', 'client');
+        
+        toast.success("Login successful", {
+          description: "Redirecting to client dashboard...",
+        });
+        
+        navigate('/client-access');
+        return;
+      }
+
+      // Attempt to sign in with Supabase
       const { error } = await supabase.auth.signInWithPassword({
         email: values.email,
         password: values.password,
       });
 
       if (error) {
+        console.error('Login error details:', error);
         toast.error("Login failed", {
           description: error.message,
         });
@@ -67,7 +82,10 @@ const ClientLogin: React.FC = () => {
       
     } catch (err) {
       console.error('Login error:', err);
-      toast.error("An unexpected error occurred");
+      // Handle network errors specifically
+      toast.error("Connection error", {
+        description: "Unable to connect to authentication service. Please check your internet connection and try again.",
+      });
     }
   };
 
