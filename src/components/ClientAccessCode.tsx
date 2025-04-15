@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "./AuthProvider";
+import { DEFAULT_ACCESS_CODE } from "./client-codes/types";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -28,9 +29,6 @@ const formSchema = z.object({
     message: "Access code must be 6 characters.",
   }),
 });
-
-// Define the default access code constant
-const DEFAULT_ACCESS_CODE = '123456';
 
 const ClientAccessCode: React.FC = () => {
   const navigate = useNavigate();
@@ -76,6 +74,9 @@ const ClientAccessCode: React.FC = () => {
           .eq('code', DEFAULT_ACCESS_CODE)
           .single();
         
+        let codeStatus = 'unused';
+        let codeId;
+        
         if (defaultCodeError && defaultCodeError.code !== 'PGRST116') {
           // If error is not "no rows returned", then it's a different error
           console.error('Error checking default code:', defaultCodeError);
@@ -84,7 +85,6 @@ const ClientAccessCode: React.FC = () => {
         }
         
         // If default code doesn't exist in database, create it
-        let codeId;
         if (!defaultCode) {
           const { data: newDefaultCode, error: createError } = await supabase
             .from('access_codes')
@@ -105,22 +105,37 @@ const ClientAccessCode: React.FC = () => {
           codeId = newDefaultCode.id;
         } else {
           codeId = defaultCode.id;
+          codeStatus = defaultCode.status;
           
-          // Update the default code status if it was unused
-          if (defaultCode.status === 'unused') {
-            await supabase
-              .from('access_codes')
-              .update({ status: 'active', used_by: user.id })
-              .eq('id', codeId);
+          // Check if code is already used
+          if (codeStatus === 'active' && defaultCode.used_by !== user.id) {
+            toast.error("Access code already used");
+            return;
           }
         }
         
         // Record that this client has verified their access using default code
-        await supabase.from('client_verifications').upsert({
-          user_id: user.id,
-          is_verified: true,
-          access_code_id: codeId
-        });
+        const { error: verificationError } = await supabase
+          .from('client_verifications')
+          .upsert({
+            user_id: user.id,
+            is_verified: true,
+            access_code_id: codeId
+          });
+        
+        if (verificationError) {
+          console.error('Error saving verification:', verificationError);
+          toast.error("Failed to save verification");
+          return;
+        }
+        
+        // Update the default code status only after verification is successful
+        if (codeStatus === 'unused') {
+          await supabase
+            .from('access_codes')
+            .update({ status: 'active', used_by: user.id })
+            .eq('id', codeId);
+        }
         
         toast.success("Default access code accepted", {
           description: "Redirecting to account setup...",
@@ -140,24 +155,38 @@ const ClientAccessCode: React.FC = () => {
         .single();
       
       if (codeError || !codeData) {
-        toast.error("Invalid access code", {
+        toast.error("Invalid or used access code", {
           description: "Please check your code and try again.",
         });
         return;
       }
       
-      // Update the access code status to active
-      await supabase
+      // Record that this client has verified their access
+      const { error: verificationError } = await supabase
+        .from('client_verifications')
+        .upsert({
+          user_id: user.id,
+          is_verified: true,
+          access_code_id: codeData.id
+        });
+      
+      if (verificationError) {
+        console.error('Error saving verification:', verificationError);
+        toast.error("Failed to save verification");
+        return;
+      }
+      
+      // Update the access code status only after verification is successful
+      const { error: updateError } = await supabase
         .from('access_codes')
         .update({ status: 'active', used_by: user.id })
         .eq('id', codeData.id);
       
-      // Record that this client has verified their access
-      await supabase.from('client_verifications').upsert({
-        user_id: user.id,
-        is_verified: true,
-        access_code_id: codeData.id
-      });
+      if (updateError) {
+        console.error('Error updating access code:', updateError);
+        toast.error("Failed to update access code status");
+        return;
+      }
       
       toast.success("Access code verified", {
         description: "Redirecting to account setup...",

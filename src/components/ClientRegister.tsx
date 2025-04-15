@@ -92,14 +92,19 @@ const ClientRegister: React.FC = () => {
         return;
       }
 
-      // Mark the access code as used
-      await supabase
+      // Only mark the access code as used AFTER successful registration
+      const { error: updateError } = await supabase
         .from('access_codes')
         .update({ 
           status: 'active',
           used_by: values.email 
         })
         .eq('code', values.accessCode);
+      
+      if (updateError) {
+        console.error('Error updating access code status:', updateError);
+        // Still proceed with registration as the user account was created
+      }
 
       toast.success("Registration successful", {
         description: "Please log in with your credentials",
